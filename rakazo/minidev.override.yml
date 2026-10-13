@@ -1,0 +1,20 @@
+# Rakazo v0.1.6 compatibility fixes, without Gemma-specific coordinate rewriting.
+x-hotfix: &hotfix
+  - ./hotfix/web-ssrf.ts:/app/packages/adapters/src/web-ssrf.ts:ro
+  - ./hotfix/keyless-http-web.ts:/app/packages/adapters/src/keyless-http-web.ts:ro
+  - ./hotfix/undici-fetch.ts:/app/packages/adapters/src/undici-fetch.ts:ro
+  - ./hotfix/remote-mcp.ts:/app/packages/adapters/src/remote-mcp.ts:ro
+services:
+  api:
+    volumes: *hotfix
+  worker:
+    volumes: *hotfix
+  demo-accounting:
+    image: ghcr.io/elie222/rakazo/app:v0.1.6
+    network_mode: service:worker
+    entrypoint: [node, /demo/server.mjs]
+    user: "1000:1000"
+    volumes:
+      - ./demo-acct:/demo
+    restart: unless-stopped
+    depends_on: [worker]

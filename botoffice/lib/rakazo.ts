@@ -3,8 +3,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const WEB = process.env.RAKAZO_URL ?? "http://127.0.0.1:5173";
-const CRED = path.join(process.env.LOCALAPPDATA ?? "", "BotTeam", "owner.json");
+const WEB = process.env.RAKAZO_URL ?? "http://127.0.0.1:35173";
+const CRED = path.join(process.env.LOCALAPPDATA ?? "", "BotTeamMiniDev", "owner.json");
 let cookie = "";
 
 async function login() {

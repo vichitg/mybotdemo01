@@ -22,3 +22,5 @@ logs/
 models/
 *.gguf
 *.log
+
+botteam.local.json

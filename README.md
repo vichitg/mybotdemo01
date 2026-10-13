@@ -1,3 +1,5 @@
+> MiniDev: see [current 9Router quickstart](docs/MINIDEV-QUICKSTART.md) for the working isolated stack, tested features, and current ports. The original Local-AI deployment below is historical.
+
 # BotTeam — ทีมพนักงาน AI ที่ทำงานอยู่ในคอมพิวเตอร์ของคุณเอง
 
 BotTeam คือแอปบน Windows ที่ให้คุณมี **"ทีมบอท AI"** ทำงานเหมือนพนักงานในบริษัท เช่น CEO ฝ่ายขาย ฝ่ายบัญชี ฝ่ายจัดซื้อ

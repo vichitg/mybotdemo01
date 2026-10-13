@@ -16,7 +16,7 @@ static class RakazoClient
     const string Web = Monitor.RakazoUrl; // web origin also serves /rpc and /api/auth (and /novnc)
     const string Email = "owner@botteam.local";
     static readonly string CredFile = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BotTeam", "owner.json");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BotTeamMiniDev", "owner.json");
     // Node's keep-alive timeout is 5s; drop idle connections before that or a POST lands on a dead socket
     static readonly SocketsHttpHandler Handler = new()
     {
@@ -51,8 +51,8 @@ static class RakazoClient
     static readonly string OpenAiKeyFile = Path.Combine(Monitor.Root, "openai-api-key.txt");
     const string OpenAiModel = "gpt-4.1";
     static readonly string RouterKeyFile = Path.Combine(Monitor.Root, "9router-api-key.txt");
-    static string RouterModel => Environment.GetEnvironmentVariable("BOTTEAM_9ROUTER_MODEL") ?? "kr/claude-sonnet-4.5";
-    static string RouterUrl => Environment.GetEnvironmentVariable("BOTTEAM_9ROUTER_URL") ?? "http://host.docker.internal:20128/v1";
+    static string RouterModel => RuntimeSettings.RouterModel;
+    static string RouterUrl => RuntimeSettings.RouterUrl;
 
     public static async Task<object> GetLlmMode()
     {
@@ -68,7 +68,7 @@ static class RakazoClient
         JsonNode? Cred(string provider) => creds.FirstOrDefault(c => c!["provider"]!.GetValue<string>() == provider);
         if (mode == "local")
         {
-            var local = Cred("openai-compatible") ?? throw new InvalidOperationException("ไม่พบ Local model ใน Rakazo");
+            var local = creds.FirstOrDefault(c => c?["provider"]?.GetValue<string>() == "openai-compatible" && c?["modelId"]?.GetValue<string>() != RouterModel) ?? throw new InvalidOperationException("ไม่พบ Local model ใน Rakazo");
             await Rpc("models/setDefault", new JsonObject { ["provider"] = "openai-compatible", ["modelId"] = local["modelId"]!.GetValue<string>() });
         }
         else if (mode == "deepseek")
@@ -125,7 +125,7 @@ static class RakazoClient
     {
         using var res = await Http.PostAsync("/rpc/" + path, Body(new JsonObject { ["json"] = input?.DeepClone() }));
         var text = await res.Content.ReadAsStringAsync();
-        if (res.StatusCode == HttpStatusCode.Unauthorized && retry)
+        if (res.StatusCode == HttpStatusCode.Unauthorized && retry && !path.StartsWith("models/"))
         {
             _ready = false;
             await EnsureReady();
@@ -155,17 +155,38 @@ static class RakazoClient
                     throw new InvalidOperationException("สร้างบัญชีเจ้าของใน Rakazo ไม่ได้");
             }
             var me = await Rpc("me", null, false);
+            _ready = true; // A model-connection error must not trigger repeated sign-ins.
             if (me?["needsModel"]?.GetValue<bool>() == true) await ConnectModel();
-            _ready = true;
         }
         finally { Gate.Release(); }
     }
 
+    static DateTimeOffset NextAuthAttempt;
     static async Task<bool> Auth(string endpoint, JsonObject body)
     {
+        if (DateTimeOffset.UtcNow < NextAuthAttempt)
+            throw new InvalidOperationException("Rakazo authentication cooling down; retry shortly");
         using var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/" + endpoint) { Content = Body(body) };
-        req.Headers.Add("Origin", Web); // better-auth checks Origin once a cookie is present
+        req.Headers.Add("Origin", Web);
         using var res = await Http.SendAsync(req);
+        if ((int)res.StatusCode == 429)
+        {
+            NextAuthAttempt = DateTimeOffset.UtcNow + (res.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(60));
+            throw new InvalidOperationException("Rakazo authentication rate limit (429); waiting before retrying");
+        }
+        if (!res.IsSuccessStatusCode && res.StatusCode != HttpStatusCode.Unauthorized)
+            throw new InvalidOperationException($"Rakazo authentication HTTP {(int)res.StatusCode}");
+        if (res.IsSuccessStatusCode)
+        {
+            // Rakazo enables Better Auth's bearer plugin; keep the issued session only in host memory.
+            var auth = JsonNode.Parse(await res.Content.ReadAsStringAsync());
+            var session = auth?["token"]?.GetValue<string>();
+            if (!string.IsNullOrEmpty(session))
+            {
+                Http.DefaultRequestHeaders.Authorization = new("Bearer", session);
+                Streams.DefaultRequestHeaders.Authorization = new("Bearer", session);
+            }
+        }
         return res.IsSuccessStatusCode;
     }
 
@@ -182,6 +203,18 @@ static class RakazoClient
 
     static async Task ConnectModel()
     {
+        if (RuntimeSettings.HasRouterKey)
+        {
+            var routerKey = File.ReadAllText(RouterKeyFile).Trim();
+            if (string.IsNullOrWhiteSpace(routerKey)) throw new InvalidOperationException("9Router gateway key is empty");
+            await Rpc("models/connect", new JsonObject
+            {
+                ["provider"] = "openai-compatible", ["baseUrl"] = RouterUrl,
+                ["modelId"] = RouterModel, ["apiKey"] = routerKey,
+                ["label"] = "9Router Gateway", ["reasoning"] = false,
+            }, false);
+            return;
+        }
         var localKeyFile = Path.Combine(Monitor.Root, "llm-api-key.txt");
         if (!File.Exists(localKeyFile) && File.Exists(OpenAiKeyFile))
         {

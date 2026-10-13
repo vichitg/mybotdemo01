@@ -22,8 +22,8 @@ public static class Monitor
     public static readonly string LlmBat = Root + @"\serve-th.bat";
     public static readonly string LlmLog = Root + @"\logs\llama-server.log";
     public const string DistroName = "Ubuntu-24.04";
-    public const string RakazoUrl = "http://127.0.0.1:5173";
-    const string RakazoApi = "http://127.0.0.1:3110";
+    public const string RakazoUrl = "http://127.0.0.1:35173";
+    const string RakazoApi = "http://127.0.0.1:33110";
     static readonly string RakazoSh = "/mnt/" + char.ToLowerInvariant(Path.GetPathRoot(Root)![0]) + Root[2..].Replace('\\', '/') + "/botadmin/rakazo.sh";
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(3) };
 
@@ -141,7 +141,7 @@ public static class Monitor
                 string P(string k) => j.TryGetProperty(k, out var v) ? v.GetString() ?? "" : "";
                 if (line[0] == 'S') { stats[P("Name")] = (P("CPUPerc"), P("MemUsage").Split(" / ")[0]); continue; }
                 var container = P("Names");
-                var name = container.Replace("rakazo-", "").Replace("-1", "");
+                var name = container.Replace("botteam-", "").Replace("-1", "");
                 if (line[0] == 'B')
                 {
                     var bot = P("Labels").Split(',').FirstOrDefault(l => l.StartsWith("rakazo.botId="))?[13..] ?? container;
@@ -189,12 +189,16 @@ public static class Monitor
         var o = Sh("backup");
         var ok = o.Split('\n').FirstOrDefault(l => l.StartsWith("OK "));
         if (ok == null) throw new Exception(o.Trim().Split('\n').LastOrDefault() ?? "สำรองข้อมูลไม่สำเร็จ");
-        var dir = ok[3..].Trim().Replace("/mnt/d/", @"D:\").Replace('/', '\\');
+        var linuxDir = ok[3..].Trim();
+        if (linuxDir.Length < 8 || !linuxDir.StartsWith("/mnt/") || linuxDir[6] != '/')
+            throw new InvalidOperationException("Backup path is not on a Windows-mounted drive");
+        var dir = char.ToUpperInvariant(linuxDir[5]) + @":\" + linuxDir[7..].Replace('/', '\\');
         return new { dir, mb = Math.Round(new DirectoryInfo(dir).EnumerateFiles().Sum(f => f.Length) / 1048576.0, 1) };
     }
 
     public static void StartLlm()
     {
+        if (RuntimeSettings.HasRouterKey) return; // cloud-only setup needs no llama-server
         Directory.CreateDirectory(Path.GetDirectoryName(LlmLog)!);
         // same .bat as a double-click; stdin is closed so its final "pause" exits when the server stops
         var psi = new ProcessStartInfo("cmd.exe", $"/s /c \"\"{LlmBat}\" > \"{LlmLog}\" 2>&1\"")
@@ -208,6 +212,7 @@ public static class Monitor
     static int wedgedChecks;
     public static async Task LlmWatchdog()
     {
+        if (RuntimeSettings.HasRouterKey) { wedgedChecks = 0; return; }
         var health = Process.GetProcessesByName("llama-server").Length > 0 ? await Get("/health", false) : null;
         if (health == null || !health.Contains("ok")) { wedgedChecks = 0; return; } // down or loading: not a wedge
         wedgedChecks = await Get("/metrics", true) == null ? wedgedChecks + 1 : 0;
@@ -220,6 +225,7 @@ public static class Monitor
 
     public static void StopLlm()
     {
+        if (RuntimeSettings.HasRouterKey) return; // Do not touch another project's local model.
         foreach (var p in Process.GetProcessesByName("llama-server")) { p.Kill(true); p.WaitForExit(10000); }
     }
 

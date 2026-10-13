@@ -1,4 +1,6 @@
-﻿# OpenAI provider setup (MiniDev)
+> Superseded for MiniDev: [MINIDEV-QUICKSTART.md](MINIDEV-QUICKSTART.md). This file records an earlier setup stage.
+
+# OpenAI provider setup (MiniDev)
 
 ## What is supported
 

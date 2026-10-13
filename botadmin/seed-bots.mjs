@@ -90,7 +90,7 @@ try {
   // demo accounting system (made-up data): MCP server on the worker's loopback, see demo-acct/server.mjs
   let acct = (await rk("mcp/servers/list")).find(x => x.slug === "demo-accounting");
   if (!acct) {
-    const secret = execSync("wsl -d Ubuntu-24.04 -- cat /home/rakazo/rakazo/demo-acct/token", { encoding: "utf8" }).trim(); // never printed
+    const secret = execSync("wsl -d Ubuntu-24.04 -- cat /root/botteam-rakazo/demo-acct/token", { encoding: "utf8" }).trim(); // never printed
     acct = await rk("mcp/servers/create", { slug: "demo-accounting", name: "ระบบบัญชีสาธิต", enabled: true, transport: "streamable_http",
       description: "ข้อมูลสมมติ: สินค้า สต็อก ลูกค้า ใบแจ้งหนี้ รับชำระ ซื้อเข้า งบทดลอง (VAT 7%)", endpoint: "http://localhost:7788/mcp", headers: {}, secret });
   }

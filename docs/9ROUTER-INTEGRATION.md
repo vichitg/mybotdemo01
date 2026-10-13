@@ -1,3 +1,5 @@
+> Superseded for MiniDev: [MINIDEV-QUICKSTART.md](MINIDEV-QUICKSTART.md). This file records an earlier setup stage.
+
 # 9Router → Rakazo / BotTeam integration
 
 ## Architecture

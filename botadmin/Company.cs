@@ -12,7 +12,7 @@ public static class Company
     static readonly HttpClient Llm = new() { Timeout = TimeSpan.FromSeconds(180) };
     public static readonly string InboxDir = Monitor.Root + @"\inbox";
     // the book the demo-accounting MCP server persists after every write (read-only here; the token is never needed)
-    static readonly string BookFile = $@"\\wsl.localhost\{Monitor.DistroName}\home\rakazo\rakazo\demo-acct\data.json";
+    static readonly string BookFile = $@"\\wsl.localhost\{Monitor.DistroName}\root\botteam-rakazo\demo-acct\data.json";
     const long MaxFile = 10 * 1024 * 1024; // Rakazo artifacts/create limit
 
     // Gemma on llama-server, thinking off; the page asks for JSON in the prompt and parses it
@@ -24,7 +24,8 @@ public static class Company
         var useRouter = provider == "9router";
         var body = new JsonObject
         {
-            ["model"] = useRouter ? Environment.GetEnvironmentVariable("BOTTEAM_9ROUTER_MODEL") ?? "kr/claude-sonnet-4.5" : useOpenAi ? "gpt-4.1" : "gemma4", ["temperature"] = 0.2, ["max_tokens"] = Math.Clamp(maxTokens, 50, 4000),
+            ["model"] = useRouter ? RuntimeSettings.RouterModel : useOpenAi ? "gpt-4.1" : "gemma4", ["temperature"] = 0.2, ["max_tokens"] = Math.Clamp(maxTokens, 50, 4000),
+            ["stream"] = false,
             ["chat_template_kwargs"] = new JsonObject { ["enable_thinking"] = false },
             ["messages"] = new JsonArray(new JsonObject { ["role"] = "system", ["content"] = system }, new JsonObject { ["role"] = "user", ["content"] = prompt }),
         };
