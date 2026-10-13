@@ -26,6 +26,10 @@ function Status {
 switch ($Action) {
   "status" { Status }
   "start" {
+    if (-not (Up "http://127.0.0.1:20128/dashboard") -and (Get-Command 9router.cmd -ErrorAction SilentlyContinue)) {
+      Start-Process -FilePath "9router.cmd" -ArgumentList "--host", "127.0.0.1", "--no-browser", "--skip-update" -WindowStyle Hidden
+      Write-Host "Starting 9Router dashboard: http://127.0.0.1:20128/dashboard"
+    }
     if (-not (Get-Process BotAdmin -ErrorAction SilentlyContinue)) { Start-Process $App; Write-Host "BotTeam opened (it starts LLM + Rakazo itself; first start ~1-3 min)" }
     if (-not (OfficePid)) {
       if (-not (Test-Path "$Office\.next\BUILD_ID")) { Write-Host "building office (first time)..."; npm --prefix $Office run build | Out-Null }

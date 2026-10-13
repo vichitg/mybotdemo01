@@ -19,16 +19,18 @@ public static class Company
     public static async Task<object> Ask(string system, string prompt, int maxTokens)
     {
         var mode = await RakazoClient.GetLlmMode();
-        var useOpenAi = ((string)mode.GetType().GetProperty("mode")!.GetValue(mode)!) == "openai";
+        var provider = (string)mode.GetType().GetProperty("mode")!.GetValue(mode)!;
+        var useOpenAi = provider == "openai";
+        var useRouter = provider == "9router";
         var body = new JsonObject
         {
-            ["model"] = useOpenAi ? "gpt-4.1" : "gemma4", ["temperature"] = 0.2, ["max_tokens"] = Math.Clamp(maxTokens, 50, 4000),
+            ["model"] = useRouter ? Environment.GetEnvironmentVariable("BOTTEAM_9ROUTER_MODEL") ?? "kr/claude-sonnet-4.5" : useOpenAi ? "gpt-4.1" : "gemma4", ["temperature"] = 0.2, ["max_tokens"] = Math.Clamp(maxTokens, 50, 4000),
             ["chat_template_kwargs"] = new JsonObject { ["enable_thinking"] = false },
             ["messages"] = new JsonArray(new JsonObject { ["role"] = "system", ["content"] = system }, new JsonObject { ["role"] = "user", ["content"] = prompt }),
         };
-        if (useOpenAi) body.Remove("chat_template_kwargs");
-        using var req = new HttpRequestMessage(HttpMethod.Post, (useOpenAi ? "https://api.openai.com" : Monitor.LlmUrl) + "/v1/chat/completions") { Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json") };
-        req.Headers.Authorization = new("Bearer", useOpenAi ? File.ReadAllText(Path.Combine(Monitor.Root, "openai-api-key.txt")).Trim() : Monitor.AdminKey());
+        if (useOpenAi || useRouter) body.Remove("chat_template_kwargs");
+        using var req = new HttpRequestMessage(HttpMethod.Post, (useRouter ? "http://127.0.0.1:20128" : useOpenAi ? "https://api.openai.com" : Monitor.LlmUrl) + "/v1/chat/completions") { Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json") };
+        req.Headers.Authorization = new("Bearer", useRouter ? File.ReadAllText(Path.Combine(Monitor.Root, "9router-api-key.txt")).Trim() : useOpenAi ? File.ReadAllText(Path.Combine(Monitor.Root, "openai-api-key.txt")).Trim() : Monitor.AdminKey());
         using var res = await Llm.SendAsync(req);
         var json = JsonNode.Parse(await res.Content.ReadAsStringAsync());
         if (!res.IsSuccessStatusCode) throw new InvalidOperationException("LLM " + (int)res.StatusCode + ": " + (json?["error"]?["message"]?.GetValue<string>() ?? ""));

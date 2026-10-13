@@ -50,12 +50,15 @@ static class RakazoClient
     static readonly string DeepSeekKeyFile = Path.Combine(Monitor.Root, "deepseek-api-key.txt");
     static readonly string OpenAiKeyFile = Path.Combine(Monitor.Root, "openai-api-key.txt");
     const string OpenAiModel = "gpt-4.1";
+    static readonly string RouterKeyFile = Path.Combine(Monitor.Root, "9router-api-key.txt");
+    static string RouterModel => Environment.GetEnvironmentVariable("BOTTEAM_9ROUTER_MODEL") ?? "kr/claude-sonnet-4.5";
+    static string RouterUrl => Environment.GetEnvironmentVariable("BOTTEAM_9ROUTER_URL") ?? "http://host.docker.internal:20128/v1";
 
     public static async Task<object> GetLlmMode()
     {
         await EnsureReady();
         var d = (await Rpc("models/credentials", null))!.AsArray().FirstOrDefault(c => c!["isDefault"]!.GetValue<bool>());
-        return new { mode = d?["provider"]?.GetValue<string>() == "deepseek" ? "deepseek" : d?["provider"]?.GetValue<string>() == "openai" ? "openai" : "local", model = d?["modelId"]?.GetValue<string>() ?? "" };
+        return new { mode = d?["provider"]?.GetValue<string>() == "deepseek" ? "deepseek" : d?["provider"]?.GetValue<string>() == "openai" ? "openai" : d?["provider"]?.GetValue<string>() == "openai-compatible" && d?["modelId"]?.GetValue<string>() == RouterModel ? "9router" : "local", model = d?["modelId"]?.GetValue<string>() ?? "" };
     }
 
     public static async Task<object> SetLlmMode(string mode)
@@ -81,6 +84,20 @@ static class RakazoClient
             }
             await Rpc("models/setDefault", new JsonObject { ["provider"] = "deepseek", ["modelId"] = DeepSeekModel });
         }
+        else if (mode == "9router")
+        {
+            if (!File.Exists(RouterKeyFile)) throw new InvalidOperationException("ต้องสร้างไฟล์ 9router-api-key.txt (รับคีย์จาก 9Router Dashboard)");
+            var key = File.ReadAllText(RouterKeyFile).Trim();
+            if (string.IsNullOrWhiteSpace(key)) throw new InvalidOperationException("9Router API key ว่างเปล่า");
+            var router = creds.FirstOrDefault(c => c?["provider"]?.GetValue<string>() == "openai-compatible" && c?["modelId"]?.GetValue<string>() == RouterModel);
+            if (router is null)
+                await Rpc("models/connect", new JsonObject {
+                    ["provider"] = "openai-compatible", ["baseUrl"] = RouterUrl,
+                    ["modelId"] = RouterModel, ["apiKey"] = key,
+                    ["label"] = "9Router Gateway", ["reasoning"] = false,
+                });
+            await Rpc("models/setDefault", new JsonObject { ["provider"] = "openai-compatible", ["modelId"] = RouterModel });
+        }
         else if (mode == "openai")
         {
             if (Cred("openai") is null)
@@ -94,7 +111,7 @@ static class RakazoClient
             }
             await Rpc("models/setDefault", new JsonObject { ["provider"] = "openai", ["modelId"] = OpenAiModel });
         }
-        else throw new ArgumentException("mode ต้องเป็น local, deepseek หรือ openai");
+        else throw new ArgumentException("mode ต้องเป็น local, deepseek, openai หรือ 9router");
         return await GetLlmMode();
     }
 

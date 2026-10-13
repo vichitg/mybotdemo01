@@ -210,12 +210,12 @@ const App = (() => {
   }
   // LLM mode = Rakazo's default model for every bot: local Gemma (data stays here) or DeepSeek cloud (faster demos)
   let llmMode = null;
-  const LLM_MODES = [["local", "🖥 Local"], ["deepseek", "⚡ DeepSeek"], ["openai", "✦ OpenAI API"]];
+  const LLM_MODES = [["local", "🖥 Local"], ["deepseek", "⚡ DeepSeek"], ["openai", "✦ OpenAI API"], ["9router", "🔀 9Router"]];
   async function setLlmMode(mode) {
     if (mode === llmMode) return;
     try {
       llmMode = (await call("llm.mode.set", { mode })).mode;
-      toast(llmMode === "openai" ? "บอททุกตัวใช้ OpenAI API (คิดค่าใช้จ่ายแยกจาก ChatGPT)" : llmMode === "deepseek" ? "บอททุกตัวใช้ DeepSeek (cloud) แล้ว" : "บอททุกตัวใช้ Local model แล้ว (ข้อมูลไม่ออกนอกเครื่อง)", "good");
+      toast(llmMode === "9router" ? "บอททุกตัวใช้ 9Router Gateway" : llmMode === "openai" ? "บอททุกตัวใช้ OpenAI API (คิดค่าใช้จ่ายแยกจาก ChatGPT)" : llmMode === "deepseek" ? "บอททุกตัวใช้ DeepSeek (cloud) แล้ว" : "บอททุกตัวใช้ Local model แล้ว (ข้อมูลไม่ออกนอกเครื่อง)", "good");
     } catch (e) { toast("สลับโหมดไม่สำเร็จ: " + e.message, "bad"); }
     renderFoot();
   }
