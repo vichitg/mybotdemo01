@@ -10,7 +10,7 @@ namespace BotAdmin;
 public static class Company
 {
     static readonly HttpClient Llm = new() { Timeout = TimeSpan.FromSeconds(180) };
-    public const string InboxDir = Monitor.Root + @"\inbox";
+    public static readonly string InboxDir = Monitor.Root + @"\inbox";
     // the book the demo-accounting MCP server persists after every write (read-only here; the token is never needed)
     static readonly string BookFile = $@"\\wsl.localhost\{Monitor.DistroName}\home\rakazo\rakazo\demo-acct\data.json";
     const long MaxFile = 10 * 1024 * 1024; // Rakazo artifacts/create limit
@@ -18,14 +18,17 @@ public static class Company
     // Gemma on llama-server, thinking off; the page asks for JSON in the prompt and parses it
     public static async Task<object> Ask(string system, string prompt, int maxTokens)
     {
+        var mode = await RakazoClient.GetLlmMode();
+        var useOpenAi = ((string)mode.GetType().GetProperty("mode")!.GetValue(mode)!) == "openai";
         var body = new JsonObject
         {
-            ["model"] = "gemma4", ["temperature"] = 0.2, ["max_tokens"] = Math.Clamp(maxTokens, 50, 4000),
+            ["model"] = useOpenAi ? "gpt-4.1" : "gemma4", ["temperature"] = 0.2, ["max_tokens"] = Math.Clamp(maxTokens, 50, 4000),
             ["chat_template_kwargs"] = new JsonObject { ["enable_thinking"] = false },
             ["messages"] = new JsonArray(new JsonObject { ["role"] = "system", ["content"] = system }, new JsonObject { ["role"] = "user", ["content"] = prompt }),
         };
-        using var req = new HttpRequestMessage(HttpMethod.Post, Monitor.LlmUrl + "/v1/chat/completions") { Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json") };
-        req.Headers.Authorization = new("Bearer", Monitor.AdminKey());
+        if (useOpenAi) body.Remove("chat_template_kwargs");
+        using var req = new HttpRequestMessage(HttpMethod.Post, (useOpenAi ? "https://api.openai.com" : Monitor.LlmUrl) + "/v1/chat/completions") { Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json") };
+        req.Headers.Authorization = new("Bearer", useOpenAi ? File.ReadAllText(Path.Combine(Monitor.Root, "openai-api-key.txt")).Trim() : Monitor.AdminKey());
         using var res = await Llm.SendAsync(req);
         var json = JsonNode.Parse(await res.Content.ReadAsStringAsync());
         if (!res.IsSuccessStatusCode) throw new InvalidOperationException("LLM " + (int)res.StatusCode + ": " + (json?["error"]?["message"]?.GetValue<string>() ?? ""));

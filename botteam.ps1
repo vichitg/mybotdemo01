@@ -3,10 +3,11 @@
 # start: opens BotTeam (it auto-starts the LLM and Rakazo) and the office server; stop: stops all four (data kept).
 param([ValidateSet("status", "start", "stop")] [string]$Action = "status")
 $ErrorActionPreference = "Stop"
-$Root = "D:\localai"
+$Root = $PSScriptRoot
 $App = "$Root\botadmin\dist\BotAdmin.exe"
 $Office = "$Root\botoffice"
-$Rk = "wsl.exe -d Ubuntu-24.04 -- bash /mnt/d/localai/botadmin/rakazo.sh"
+$WslRoot = "/mnt/" + $Root.Substring(0,1).ToLower() + $Root.Substring(2).Replace("\", "/")
+$Rk = "wsl.exe -d Ubuntu-24.04 -- bash $WslRoot/botadmin/rakazo.sh"
 
 function Up($url) { try { (Invoke-WebRequest $url -UseBasicParsing -TimeoutSec 3).StatusCode -lt 500 } catch { $false } }
 function OfficePid { (Get-NetTCPConnection -LocalPort 3300 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess }

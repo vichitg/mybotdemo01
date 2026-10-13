@@ -210,12 +210,12 @@ const App = (() => {
   }
   // LLM mode = Rakazo's default model for every bot: local Gemma (data stays here) or DeepSeek cloud (faster demos)
   let llmMode = null;
-  const LLM_MODES = [["local", "🖥 Local"], ["deepseek", "⚡ DeepSeek"]];
+  const LLM_MODES = [["local", "🖥 Local"], ["deepseek", "⚡ DeepSeek"], ["openai", "✦ OpenAI API"]];
   async function setLlmMode(mode) {
     if (mode === llmMode) return;
     try {
       llmMode = (await call("llm.mode.set", { mode })).mode;
-      toast(llmMode === "deepseek" ? "บอททุกตัวใช้ DeepSeek (cloud) แล้ว" : "บอททุกตัวใช้ Local model แล้ว (ข้อมูลไม่ออกนอกเครื่อง)", "good");
+      toast(llmMode === "openai" ? "บอททุกตัวใช้ OpenAI API (คิดค่าใช้จ่ายแยกจาก ChatGPT)" : llmMode === "deepseek" ? "บอททุกตัวใช้ DeepSeek (cloud) แล้ว" : "บอททุกตัวใช้ Local model แล้ว (ข้อมูลไม่ออกนอกเครื่อง)", "good");
     } catch (e) { toast("สลับโหมดไม่สำเร็จ: " + e.message, "bad"); }
     renderFoot();
   }
@@ -224,7 +224,7 @@ const App = (() => {
     const llmDot = !s ? "" : llm.health === "พร้อม" ? "good" : llm.process ? "warn" : "bad";
     const rkDot = !s ? "" : rk.health.startsWith("พร้อม") ? "good" : "bad";
     // llama-server queue: 2 slots think at once, the rest wait in its own queue
-    const q = llmMode !== "deepseek" && llm && (llm.busy || llm.deferred) ? `<span class="muted" style="font-size:11px;margin-left:6px">🧠 ${llm.busy} กำลังคิด${llm.deferred ? ` · ${llm.deferred} รอคิว` : ""}</span>` : "";
+    const q = llmMode === "local" && llm && (llm.busy || llm.deferred) ? `<span class="muted" style="font-size:11px;margin-left:6px">🧠 ${llm.busy} กำลังคิด${llm.deferred ? ` · ${llm.deferred} รอคิว` : ""}</span>` : "";
     $("#sideFoot").innerHTML = `
       ${llmMode ? `<div class="llm-mode" title="โมเดลที่บอททุกตัวใช้">${LLM_MODES.map(([m, t]) => `<button class="${m === llmMode ? "on" : ""}" data-mode="${m}">${t}</button>`).join("")}</div>` : ""}
       <div class="llm-mode" title="ธีมของแอป (ระบบ = ตาม Windows)">${THEMES.map(([t, l]) => `<button class="${t === Theme.choice() ? "on" : ""}" data-theme-pick="${t}">${l}</button>`).join("")}</div>

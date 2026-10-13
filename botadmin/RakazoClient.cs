@@ -47,13 +47,15 @@ static class RakazoClient
     // pi-ai in Rakazo v0.1.6 predates the "deepseek-flash" name; this catalog id declares image input (computer use)
     // and DeepSeek serves it with deepseek-flash (V4.1-Flash)
     const string DeepSeekModel = "deepseek-v4-flash-vision-exp";
-    const string DeepSeekKeyFile = Monitor.Root + @"\deepseek-api-key.txt";
+    static readonly string DeepSeekKeyFile = Path.Combine(Monitor.Root, "deepseek-api-key.txt");
+    static readonly string OpenAiKeyFile = Path.Combine(Monitor.Root, "openai-api-key.txt");
+    const string OpenAiModel = "gpt-4.1";
 
     public static async Task<object> GetLlmMode()
     {
         await EnsureReady();
         var d = (await Rpc("models/credentials", null))!.AsArray().FirstOrDefault(c => c!["isDefault"]!.GetValue<bool>());
-        return new { mode = d?["provider"]?.GetValue<string>() == "deepseek" ? "deepseek" : "local", model = d?["modelId"]?.GetValue<string>() ?? "" };
+        return new { mode = d?["provider"]?.GetValue<string>() == "deepseek" ? "deepseek" : d?["provider"]?.GetValue<string>() == "openai" ? "openai" : "local", model = d?["modelId"]?.GetValue<string>() ?? "" };
     }
 
     public static async Task<object> SetLlmMode(string mode)
@@ -79,7 +81,20 @@ static class RakazoClient
             }
             await Rpc("models/setDefault", new JsonObject { ["provider"] = "deepseek", ["modelId"] = DeepSeekModel });
         }
-        else throw new ArgumentException("mode ต้องเป็น local หรือ deepseek");
+        else if (mode == "openai")
+        {
+            if (Cred("openai") is null)
+            {
+                var key = File.Exists(OpenAiKeyFile) ? File.ReadLines(OpenAiKeyFile).Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith("sk-")) : null;
+                await Rpc("models/connect", new JsonObject
+                {
+                    ["provider"] = "openai", ["modelId"] = OpenAiModel,
+                    ["apiKey"] = key ?? throw new InvalidOperationException("ไม่พบ OpenAI API key ใน " + OpenAiKeyFile + " (ChatGPT Subscription ไม่ใช่ API key)"),
+                });
+            }
+            await Rpc("models/setDefault", new JsonObject { ["provider"] = "openai", ["modelId"] = OpenAiModel });
+        }
+        else throw new ArgumentException("mode ต้องเป็น local, deepseek หรือ openai");
         return await GetLlmMode();
     }
 
@@ -150,7 +165,18 @@ static class RakazoClient
 
     static async Task ConnectModel()
     {
-        var key = File.ReadLines(Path.Combine(Monitor.Root, "llm-api-key.txt"))
+        var localKeyFile = Path.Combine(Monitor.Root, "llm-api-key.txt");
+        if (!File.Exists(localKeyFile) && File.Exists(OpenAiKeyFile))
+        {
+            var openAiKey = File.ReadLines(OpenAiKeyFile).Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith("sk-"))
+                ?? throw new InvalidOperationException("OpenAI API key ไม่ถูกต้อง");
+            await Rpc("models/connect", new JsonObject
+            {
+                ["provider"] = "openai", ["modelId"] = OpenAiModel, ["apiKey"] = openAiKey,
+            }, false);
+            return;
+        }
+        var key = File.ReadLines(localKeyFile)
             .Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith("rakazo-"))
             ?? throw new InvalidOperationException("ไม่พบคีย์ rakazo- ใน llm-api-key.txt");
         await Rpc("models/connect", new JsonObject

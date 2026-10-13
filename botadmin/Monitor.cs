@@ -17,14 +17,14 @@ public record Snapshot(Gpu? Gpu, double CpuPct, double RamUsedGb, double RamTota
 
 public static class Monitor
 {
-    public const string Root = @"D:\localai";
+    public static readonly string Root = Path.GetFullPath(Environment.GetEnvironmentVariable("BOTTEAM_ROOT") ?? Path.Combine(AppContext.BaseDirectory, "..", ".."));
     public const string LlmUrl = "http://127.0.0.1:8080";
-    public const string LlmBat = Root + @"\serve-th.bat";
-    public const string LlmLog = Root + @"\logs\llama-server.log";
+    public static readonly string LlmBat = Root + @"\serve-th.bat";
+    public static readonly string LlmLog = Root + @"\logs\llama-server.log";
     public const string DistroName = "Ubuntu-24.04";
     public const string RakazoUrl = "http://127.0.0.1:5173";
     const string RakazoApi = "http://127.0.0.1:3110";
-    const string RakazoSh = "/mnt/d/localai/botadmin/rakazo.sh";
+    static readonly string RakazoSh = "/mnt/" + char.ToLowerInvariant(Path.GetPathRoot(Root)![0]) + Root[2..].Replace('\\', '/') + "/botadmin/rakazo.sh";
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(3) };
 
     // admin key = the "gemma-" line; never shown in UI or logs

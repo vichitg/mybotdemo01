@@ -23,7 +23,7 @@ case "${1:-status}" in
   stop) dc stop ;;
   logs) dc logs --no-color --tail 200 "${2:-api}" ;;
   # published-image install has no scripts/backup.sh: same content (pg_dump + data volume) to D:localaiackups
-  backup) d=/mnt/d/localai/backups/rakazo-$(date +%Y%m%d-%H%M%S); mkdir -p "$d" &&
+  backup) d="$(cd "$(dirname "$0")/.." && pwd)/backups/rakazo-$(date +%Y%m%d-%H%M%S)"; mkdir -p "$d" &&
           docker exec rakazo-postgres-1 pg_dump -U rakazo -d rakazo -Fc > "$d/rakazo.dump" &&
           docker run --rm -v rakazo_appdata:/data:ro -v "$d":/out busybox:1 tar czf /out/appdata.tgz -C /data . &&
           cp docker-compose.override.yml "$d/" && tar czf "$d/hotfix.tgz" hotfix computer-th demo-acct && echo "OK $d" && ls -la "$d" ||
